@@ -48,19 +48,20 @@ int main (){
     //Criar área de memória compartilahda;
     shmid = shmget(KEY, SIZE, shmFlag);     //smhid recebe o retorno dessa função. < 0 se se der erro;
     if(shmid < 0){
-        perror("Erro no shmget");
+        perror("Erro no shmget\n");
         exit(1);                            //Valor padrão de retorno de erros;
     }
 
     //Anexando o segmento de memória ao processo pai;
     comp_var = (int *)shmat(shmid, NULL, 0);
     if(comp_var == (int *)-1){
-        perror("Erro no shmat");
+        perror("Erro no shmat\n");
         exit(1);
     }
 
     *comp_var = 1;
 
+    //Limpeza de semáforas na memória;
     sem_t *semaforo1;
     sem_close(semaforo1);
     sem_unlink("sem1");
@@ -73,9 +74,10 @@ int main (){
     sem_destroy(semaforo2);
     semaforo2 = semaphore2();
 
-    int msgid = msgget(MSG_KEY, IPC_CREAT | 0666);
+    //Criação da fila de mensagens;
+    int msgid = msgget(MSG_KEY, IPC_CREAT | PERMISSION);
     if (msgid < 0) {
-        perror("Erro ao criar fila de mensagens");
+        perror("Erro ao criar fila de mensagens\n");
         exit(1);
     }
 
@@ -83,20 +85,21 @@ int main (){
         pid_t pid = fork();
 
         if(pid < 0){
-            perror("Erro ao criar filho");
+            perror("Erro ao criar filho\n");
             exit(1);
         }else if(pid == 0){
-            sem_wait(semaforo1);           //Bloqueia o filho;
-            srand(time(NULL) ^ getpid());
-            usleep((rand() % 801 + 200) * 1000); //De 200ms a 1000ms;
+            sem_wait(semaforo1);                    //Bloqueia o filho;
+            srand(time(NULL) ^ getpid());           //Utiliza o PID para evitar processos feitos muito rapidamente e que possam usar a mesma hora relógio;
+            usleep((rand() % 801 + 200) * 1000);    //Timer aleatório de 200ms a 1000ms;
 
+            //Início de Região Crítica com exclusão mútua;
             int aux;
-            sem_wait(semaforo2);
+            sem_wait(semaforo2);                    //Semáforo para sinalizar que entrou na Região Crítica;
             aux = (*comp_var);          
-            (*comp_var) -= 1;                   //Filho decrementa a variável compartilhada;
-            sem_post(semaforo2);
+            (*comp_var) -= 1;                       //Filho decrementa a variável compartilhada;
+            sem_post(semaforo2);                    //Semáforo para sinalizar que saiu da Região Crítica;
 
-            usleep((rand() % 501 + 500) * 1000); //De 500ms a 1000ms;
+            usleep((rand() % 501 + 500) * 1000);    //Timer aleatório de 500ms a 1000ms;
 
             //Criar thread para imprimir valor;
             pthread_t thread_id;
@@ -104,7 +107,7 @@ int main (){
             *args = aux;
 
             if (pthread_create(&thread_id, NULL, thread1, (void *)args) != 0) {
-                perror("Erro ao criar thread");
+                perror("Erro ao criar thread\n");
                 exit(1);
             }
 
@@ -116,7 +119,7 @@ int main (){
             snprintf(msg.mtext, sizeof(msg.mtext), "Processo filho de PID %d foi finalizado", getpid());
 
             if (msgsnd(msgid, &msg, sizeof(msg.mtext), 0) == -1) {
-                perror("Erro ao enviar mensagem");
+                perror("Erro ao enviar mensagem\n");
             }
 
             printf("Processo filho com pid %d sera encerrado!\n", getpid());
@@ -125,7 +128,6 @@ int main (){
             //processos do pai;
         }
     }
-
 
     sleep(2);                           //Pai dorme por 2 segundos;
     //Libera os filhos (instruções sequenciais, liberação é simultânea);
@@ -137,7 +139,7 @@ int main (){
     for (int i = 0; i < NUM_FILHOS; i++) {
         struct msgbuf msg;
         if (msgrcv(msgid, &msg, sizeof(msg.mtext), 0, 0) == -1) {
-            perror("Erro ao receber mensagem");
+            perror("Erro ao receber mensagem\n");
         } else {
             printf("PAI: %s\n", msg.mtext);
         }
@@ -159,7 +161,7 @@ int main (){
     sem_unlink("sem2");
     sem_destroy(semaforo2);
     
-    // Libera a memória
+    //Libera a memória;
     if(shmdt(comp_var) < 0){
         perror("Erro ao liberar variável");
         exit(1);

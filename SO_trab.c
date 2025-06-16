@@ -97,9 +97,8 @@ int main (){
             sem_wait(semaforo2);                    //Semáforo para sinalizar que entrou na Região Crítica;
             aux = (*comp_var);          
             (*comp_var) -= 1;                       //Filho decrementa a variável compartilhada;
-            sem_post(semaforo2);                    //Semáforo para sinalizar que saiu da Região Crítica;
-
             usleep((rand() % 501 + 500) * 1000);    //Timer aleatório de 500ms a 1000ms;
+            sem_post(semaforo2);                    //Semáforo para sinalizar que saiu da Região Crítica;
 
             //Criar thread para imprimir valor;
             pthread_t thread_id;
@@ -122,13 +121,14 @@ int main (){
                 perror("Erro ao enviar mensagem\n");
             }
 
-            printf("Processo filho com pid %d sera encerrado!\n", getpid());
-            exit(0);
+            printf("FILHO: Processo filho com pid %d sera encerrado!\n", getpid());
+            exit(0);            //Encerra o processo filho;
         }else{
             //processos do pai;
         }
     }
 
+    //Daqui para baixo apenas o pai irá executar, pois os filhos são encerrados no seu "else if" antes que possam passar para esta parte;
     sleep(2);                           //Pai dorme por 2 segundos;
     //Libera os filhos (instruções sequenciais, liberação é simultânea);
     for (int i = 0; i < NUM_FILHOS; i++) {
@@ -146,7 +146,7 @@ int main (){
     }
 
     //Mensagem final do pai;
-    printf("Processo pai de PID %d informa que todos os filhos foram finalizados e o valor atual da memoria compartilhada é %d\n", getpid(), *comp_var);
+    printf("Processo pai de PID %d informa que todos os filhos foram finalizados e o valor atual da memoria compartilhada é %d.\n", getpid(), *comp_var);
 
     //Libera a fila de mensagens;
     msgctl(msgid, IPC_RMID, NULL);
